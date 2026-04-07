@@ -195,7 +195,7 @@
         .then(res => res.json())
         .then(data => {
             quizData = data;
-            data.forEach((item, index) => {
+            data.forEach((item, index) => {	
                 const opt = document.createElement('option');
                 opt.value = index;
                 opt.textContent = item.title;
