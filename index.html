@@ -27,10 +27,11 @@
 
         header {
             width: 100%;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
             background: white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 10;
         }
 
         select {
@@ -38,8 +39,38 @@
             font-size: 16px;
             border-radius: 8px;
             border: 1px solid #ddd;
-            width: 80%;
+            width: 90%;
             max-width: 400px;
+        }
+
+        /* 화살표 내비게이션 바 */
+        .nav-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 90%;
+            max-width: 500px;
+            margin-top: 20px;
+        }
+
+        .nav-btn {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        #progress {
+            font-weight: bold;
+            color: var(--primary-color);
         }
 
         .container {
@@ -49,7 +80,6 @@
             align-items: center;
             width: 100%;
             perspective: 1000px;
-            touch-action: none;
         }
 
         .card {
@@ -58,7 +88,7 @@
             height: 300px;
             position: relative;
             transform-style: preserve-3d;
-            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.5s;
             cursor: pointer;
         }
 
@@ -83,54 +113,33 @@
             line-height: 1.6;
         }
 
-        .card-front {
-            background-color: var(--card-bg);
-            border: 2px solid var(--primary-color);
-        }
-
-        .card-back {
-            background-color: var(--primary-color);
-            color: white;
-            transform: rotateY(180deg);
-        }
+        .card-front { background-color: var(--card-bg); border: 2px solid var(--primary-color); }
+        .card-back { background-color: var(--primary-color); color: white; transform: rotateY(180deg); }
 
         .action-area {
             padding: 20px;
             display: flex;
             flex-direction: column;
-            align-items: center;
             gap: 10px;
+            width: 100%;
+            align-items: center;
         }
 
-        #wrong-btn {
-            background-color: var(--danger-color);
-            color: white;
+        .btn-main {
             border: none;
-            padding: 12px 30px;
+            padding: 15px 40px;
             border-radius: 50px;
             font-size: 1rem;
             font-weight: bold;
             cursor: pointer;
-            transition: transform 0.1s;
+            width: 80%;
+            max-width: 300px;
         }
 
-        #wrong-btn:active {
-            transform: scale(0.95);
-        }
+        #wrong-btn { background-color: var(--danger-color); color: white; }
+        #copy-btn { background-color: #2c3e50; color: white; }
 
-        .controls {
-            font-size: 0.8rem;
-            color: #888;
-            text-align: center;
-        }
-
-        /* 결과 화면 스타일 */
-        .result-view {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-        }
+        .result-view { display: none; flex-direction: column; align-items: center; text-align: center; }
     </style>
 </head>
 <body>
@@ -141,32 +150,35 @@
     </select>
 </header>
 
-<div class="container" id="swipe-area">
+<div class="nav-bar">
+    <button class="nav-btn" id="prev-btn" onclick="prevQuestion()">< 이전</button>
+    <div id="progress">0 / 0</div>
+    <button class="nav-btn" id="next-btn" onclick="nextQuestion()">다음 ></button>
+</div>
+
+<div class="container">
     <div class="card" id="card">
         <div class="card-face card-front" id="question-text">세트를 선택해주세요.</div>
         <div class="card-face card-back" id="answer-text">정답</div>
     </div>
 
     <div id="result-display" class="result-view">
-        <h2>학습 완료!</h2>
+        <h2>학습 완료</h2>
         <p id="wrong-count-text"></p>
-        <button onclick="location.reload()" style="padding: 10px 20px;">다시 시작하기</button>
+        <button id="copy-btn" class="btn-main" style="display: none;">오답 세트 복사</button>
+        <button onclick="location.reload()" style="margin-top: 15px; background: none; border: none; color: #888; text-decoration: underline; cursor: pointer;">다시 시작</button>
     </div>
 </div>
 
 <div class="action-area">
-    <button id="wrong-btn" style="display: none;">틀림</button>
-    <div class="controls">
-        ← 이전 | 클릭: 뒤집기 | 다음 →<br>
-        (<span id="progress">0/0</span>)
-    </div>
+    <button id="wrong-btn" class="btn-main" style="display: none;">틀림 (체크)</button>
 </div>
 
 <script>
     let quizData = [];
     let currentSet = null;
     let currentIndex = 0;
-    let wrongAnswers = new Set(); // 틀린 문제 번호 저장
+    let wrongIndices = new Set();
     
     const selector = document.getElementById('set-selector');
     const card = document.getElementById('card');
@@ -175,10 +187,12 @@
     const progress = document.getElementById('progress');
     const wrongBtn = document.getElementById('wrong-btn');
     const resultDisplay = document.getElementById('result-display');
+    const copyBtn = document.getElementById('copy-btn');
+    const prevBtn = document.getElementById('prev-btn');
 
-    // JSON 로드
+    // JSON 로드 (파일명 확인 필수: quiz.json)
     fetch('quiz.json')
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => {
             quizData = data;
             data.forEach((item, index) => {
@@ -187,39 +201,42 @@
                 opt.textContent = item.title;
                 selector.appendChild(opt);
             });
-        });
+        }).catch(err => console.error("JSON 로드 실패:", err));
 
     selector.addEventListener('change', (e) => {
         if (e.target.value === "") return;
         currentSet = quizData[e.target.value];
         currentIndex = 0;
-        wrongAnswers.clear();
-        card.style.display = 'block';
-        resultDisplay.style.display = 'none';
-        wrongBtn.style.display = 'block';
+        wrongIndices.clear();
+        resetDisplay();
         showQuestion();
     });
 
-    card.addEventListener('click', () => {
-        card.classList.toggle('is-flipped');
-    });
+    function resetDisplay() {
+        card.style.display = 'block';
+        resultDisplay.style.display = 'none';
+        wrongBtn.style.display = 'block';
+    }
 
-    // 틀림 버튼 클릭 시
+    card.addEventListener('click', () => card.classList.toggle('is-flipped'));
+
     wrongBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        wrongAnswers.add(currentIndex);
-        // alert('오답 리스트에 추가되었습니다.');
+        wrongIndices.add(currentIndex);
         nextQuestion();
     });
 
     function showQuestion() {
         if (!currentSet) return;
         card.classList.remove('is-flipped');
-        setTimeout(() => {
-            qText.textContent = currentSet.quiz[currentIndex];
-            aText.textContent = currentSet.answer[currentIndex];
-            progress.textContent = `${currentIndex + 1} / ${currentSet.quiz.length}`;
-        }, 150);
+        
+        // 카드 텍스트 업데이트
+        qText.textContent = currentSet.quiz[currentIndex];
+        aText.textContent = currentSet.answer[currentIndex];
+        
+        // 상태 업데이트
+        progress.textContent = `${currentIndex + 1} / ${currentSet.quiz.length}`;
+        prevBtn.disabled = (currentIndex === 0);
     }
 
     function nextQuestion() {
@@ -243,50 +260,38 @@
         wrongBtn.style.display = 'none';
         resultDisplay.style.display = 'flex';
         
-        const count = wrongAnswers.size;
-        let msg = `총 ${currentSet.quiz.length}문제 중 ${count}문제를 틀렸습니다.`;
-        if (count > 0) {
-            msg += `<br><br><strong>틀린 문제 목록:</strong><br>`;
-            wrongAnswers.forEach(idx => {
-                msg += `- ${currentSet.quiz[idx]}<br>`;
-            });
-        }
-        document.getElementById('wrong-count-text').innerHTML = msg;
+        const count = wrongIndices.size;
+        document.getElementById('wrong-count-text').innerHTML = `총 ${currentSet.quiz.length}문제 중 ${count}문제를 틀렸습니다.`;
+        copyBtn.style.display = count > 0 ? 'block' : 'none';
     }
 
-    // 스와이프 로직
-    let touchstartX = 0;
-    let touchendX = 0;
-    const swipeArea = document.getElementById('swipe-area');
+    copyBtn.addEventListener('click', () => {
+        const now = new Date();
+        const timeStr = `${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+        
+        const wrongQ = [];
+        const wrongA = [];
+        Array.from(wrongIndices).sort((a,b)=>a-b).forEach(idx => {
+            wrongQ.push(currentSet.quiz[idx]);
+            wrongA.push(currentSet.answer[idx]);
+        });
 
-    swipeArea.addEventListener('touchstart', e => {
-        touchstartX = e.changedTouches[0].screenX;
+        const resultJSON = {
+            title: `${timeStr} {${currentSet.title}} 오답 세트`,
+            quiz: wrongQ,
+            answer: wrongA
+        };
+
+        navigator.clipboard.writeText(JSON.stringify(resultJSON, null, 4)).then(() => {
+            alert("오답 세트가 JSON 형식으로 복사되었습니다!");
+        });
     });
-
-    swipeArea.addEventListener('touchend', e => {
-        touchendX = e.changedTouches[0].screenX;
-        handleGesture();
-    });
-
-    function handleGesture() {
-        const threshold = 50;
-        if (touchendX > touchstartX + threshold) {
-            // 오른쪽 스와이프: 다음
-            nextQuestion();
-        } else if (touchendX < touchstartX - threshold) {
-            // 왼쪽 스와이프: 이전
-            prevQuestion();
-        }
-    }
 
     // 키보드 지원
     document.addEventListener('keydown', (e) => {
         if (e.key === "ArrowRight") nextQuestion();
         if (e.key === "ArrowLeft") prevQuestion();
-        if (e.key === " ") {
-            e.preventDefault(); 
-            card.classList.toggle('is-flipped');
-        }
+        if (e.key === " ") { e.preventDefault(); card.classList.toggle('is-flipped'); }
     });
 </script>
 
