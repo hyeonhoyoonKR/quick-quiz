@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Flashcards</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --danger-color: #e74c3c;
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        select {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            width: 80%;
+            max-width: 400px;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            perspective: 1000px;
+            touch-action: none;
+        }
+
+        .card {
+            width: 90%;
+            max-width: 500px;
+            height: 300px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+            box-sizing: border-box;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            font-size: 1.2rem;
+            line-height: 1.6;
+        }
+
+        .card-front {
+            background-color: var(--card-bg);
+            border: 2px solid var(--primary-color);
+        }
+
+        .card-back {
+            background-color: var(--primary-color);
+            color: white;
+            transform: rotateY(180deg);
+        }
+
+        .action-area {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #wrong-btn {
+            background-color: var(--danger-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        #wrong-btn:active {
+            transform: scale(0.95);
+        }
+
+        .controls {
+            font-size: 0.8rem;
+            color: #888;
+            text-align: center;
+        }
+
+        /* 결과 화면 스타일 */
+        .result-view {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <select id="set-selector">
+        <option value="">문제 세트를 선택하세요</option>
+    </select>
+</header>
+
+<div class="container" id="swipe-area">
+    <div class="card" id="card">
+        <div class="card-face card-front" id="question-text">세트를 선택해주세요.</div>
+        <div class="card-face card-back" id="answer-text">정답</div>
+    </div>
+
+    <div id="result-display" class="result-view">
+        <h2>학습 완료!</h2>
+        <p id="wrong-count-text"></p>
+        <button onclick="location.reload()" style="padding: 10px 20px;">다시 시작하기</button>
+    </div>
+</div>
+
+<div class="action-area">
+    <button id="wrong-btn" style="display: none;">틀림</button>
+    <div class="controls">
+        ← 이전 | 클릭: 뒤집기 | 다음 →<br>
+        (<span id="progress">0/0</span>)
+    </div>
+</div>
+
+<script>
+    let quizData = [];
+    let currentSet = null;
+    let currentIndex = 0;
+    let wrongAnswers = new Set(); // 틀린 문제 번호 저장
+    
+    const selector = document.getElementById('set-selector');
+    const card = document.getElementById('card');
+    const qText = document.getElementById('question-text');
+    const aText = document.getElementById('answer-text');
+    const progress = document.getElementById('progress');
+    const wrongBtn = document.getElementById('wrong-btn');
+    const resultDisplay = document.getElementById('result-display');
+
+    // JSON 로드
+    fetch('quiz.json')
+        .then(response => response.json())
+        .then(data => {
+            quizData = data;
+            data.forEach((item, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.textContent = item.title;
+                selector.appendChild(opt);
+            });
+        });
+
+    selector.addEventListener('change', (e) => {
+        if (e.target.value === "") return;
+        currentSet = quizData[e.target.value];
+        currentIndex = 0;
+        wrongAnswers.clear();
+        card.style.display = 'block';
+        resultDisplay.style.display = 'none';
+        wrongBtn.style.display = 'block';
+        showQuestion();
+    });
+
+    card.addEventListener('click', () => {
+        card.classList.toggle('is-flipped');
+    });
+
+    // 틀림 버튼 클릭 시
+    wrongBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        wrongAnswers.add(currentIndex);
+        // alert('오답 리스트에 추가되었습니다.');
+        nextQuestion();
+    });
+
+    function showQuestion() {
+        if (!currentSet) return;
+        card.classList.remove('is-flipped');
+        setTimeout(() => {
+            qText.textContent = currentSet.quiz[currentIndex];
+            aText.textContent = currentSet.answer[currentIndex];
+            progress.textContent = `${currentIndex + 1} / ${currentSet.quiz.length}`;
+        }, 150);
+    }
+
+    function nextQuestion() {
+        if (!currentSet) return;
+        if (currentIndex < currentSet.quiz.length - 1) {
+            currentIndex++;
+            showQuestion();
+        } else {
+            showResult();
+        }
+    }
+
+    function prevQuestion() {
+        if (!currentSet || currentIndex <= 0) return;
+        currentIndex--;
+        showQuestion();
+    }
+
+    function showResult() {
+        card.style.display = 'none';
+        wrongBtn.style.display = 'none';
+        resultDisplay.style.display = 'flex';
+        
+        const count = wrongAnswers.size;
+        let msg = `총 ${currentSet.quiz.length}문제 중 ${count}문제를 틀렸습니다.`;
+        if (count > 0) {
+            msg += `<br><br><strong>틀린 문제 목록:</strong><br>`;
+            wrongAnswers.forEach(idx => {
+                msg += `- ${currentSet.quiz[idx]}<br>`;
+            });
+        }
+        document.getElementById('wrong-count-text').innerHTML = msg;
+    }
+
+    // 스와이프 로직
+    let touchstartX = 0;
+    let touchendX = 0;
+    const swipeArea = document.getElementById('swipe-area');
+
+    swipeArea.addEventListener('touchstart', e => {
+        touchstartX = e.changedTouches[0].screenX;
+    });
+
+    swipeArea.addEventListener('touchend', e => {
+        touchendX = e.changedTouches[0].screenX;
+        handleGesture();
+    });
+
+    function handleGesture() {
+        const threshold = 50;
+        if (touchendX > touchstartX + threshold) {
+            // 오른쪽 스와이프: 다음
+            nextQuestion();
+        } else if (touchendX < touchstartX - threshold) {
+            // 왼쪽 스와이프: 이전
+            prevQuestion();
+        }
+    }
+
+    // 키보드 지원
+    document.addEventListener('keydown', (e) => {
+        if (e.key === "ArrowRight") nextQuestion();
+        if (e.key === "ArrowLeft") prevQuestion();
+        if (e.key === " ") {
+            e.preventDefault(); 
+            card.classList.toggle('is-flipped');
+        }
+    });
+</script>
+
+</body>
+</html>
