@@ -1,0 +1,14 @@
+{
+  "bio": {
+    "title": "생물학",
+    "quiz_file": "src/bio/quiz.json"
+  },
+  "system programming": {
+    "title": "시스템 프로그래밍",
+    "quiz_file": "src/system programming/quiz.json"
+  },
+  "chemistry": {
+	"title": "일반화학",
+	"quiz_file": "src/chemistry/quiz.json"
+  }
+}
