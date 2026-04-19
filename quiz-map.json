@@ -10,5 +10,9 @@
   "chemistry": {
 	"title": "일반화학",
 	"quiz_file": "src/chemistry/quiz.json"
+  },
+  "operating system": {
+	"title": "운영체제",
+	"quiz_file": "src/operating system/quiz.json"
   }
 }
