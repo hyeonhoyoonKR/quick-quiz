@@ -1,0 +1,26 @@
+{
+  "bio": {
+    "title": "생물학",
+    "quiz_file": "src/bio/quiz.json"
+  },
+  "system programming": {
+    "title": "시스템 프로그래밍",
+    "quiz_file": "src/system programming/quiz.json"
+  },
+  "chemistry": {
+	"title": "일반화학",
+	"quiz_file": "src/chemistry/quiz.json"
+  },
+  "operating system": {
+	"title": "운영체제",
+	"quiz_file": "src/operating system/quiz.json"
+  },
+  "system programming final": {
+	"title": "시스템 프로그래밍 기말",
+	"quiz_file": "src/system programming final/quiz.json"
+  },
+  "biology final": {
+	"title": "생물 3차 시험",
+	"quiz_file": "src/bio3/quiz.json"
+  }
+}

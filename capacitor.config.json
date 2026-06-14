@@ -1,0 +1,13 @@
+{
+  "appId": "com.hyeonhoyoon.quizflashcards",
+  "appName": "Quiz Flashcards",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  }
+}
